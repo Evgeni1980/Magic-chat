@@ -1,5 +1,7 @@
 package server;
 
+import service.ServiceMessages;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -12,6 +14,7 @@ public class ClientHandler {
     private DataOutputStream out;
     private boolean authenticated;
     private String nickname;
+    private String login;
 
     public ClientHandler(Server server, Socket socket) {
         this.server = server;
@@ -23,52 +26,75 @@ public class ClientHandler {
 
             new Thread(() -> {
                 try {
-                    //Цикл аутентификации
+//                    socket.setSoTimeout(0);
+                    //цикл аутентификации
                     while (true) {
                         String str = in.readUTF();
+
                         if (str.equals("/end")) {
                             sendMsg("/end");
                             break;
                         }
-                        if (str.startsWith("/auth")) {
+//                        if (str.startsWith("/auth")) {
+                        if (str.startsWith(ServiceMessages.AUTH)) {
                             String[] token = str.split(" ", 3);
                             if (token.length < 3) {
                                 continue;
                             }
-                            String newNick = server.getAuthService().getNicknameByLoginAndPassword(token[1], token[2]);
-                            if(newNick != null){
-                                authenticated = true;
-                                nickname = newNick;
-                                sendMsg("/authok " + nickname);
-                                server.subscribe(this);
-                                System.out.println("Client: " + nickname + " authenticated");
-                                break;
+                            String newNick = server.getAuthService()
+                                    .getNicknameByLoginAndPassword(token[1], token[2]);
+                            login = token[1];
+                            if (newNick != null) {
+                                if (!server.isLoginAuthenticated(login)) {
+                                    authenticated = true;
+                                    nickname = newNick;
+                                    sendMsg(ServiceMessages.AUTH_OK + " " + nickname);
+                                    server.subscribe(this);
+                                    System.out.println("Client: " + nickname + " authenticated");
+                                    break;
+                                } else {
+                                    sendMsg("С этим логином уже зашли в чат");
+                                }
                             } else {
                                 sendMsg("Неверный логин / пароль");
                             }
                         }
-
+                        if (str.startsWith("/reg")) {
+                            String[] token = str.split(" ", 4);
+                            if (token.length < 4) {
+                                continue;
+                            }
+                            if (server.getAuthService()
+                                    .registration(token[1], token[2], token[3])) {
+                                sendMsg("/reg_ok");
+                            } else {
+                                sendMsg("/reg_no");
+                            }
+                        }
                     }
-
-                    //Цикл работы
+                    //цикл работы
                     while (authenticated) {
                         String str = in.readUTF();
-                        if(str.startsWith("/")){
+
+                        if (str.startsWith("/")) {
                             if (str.equals("/end")) {
                                 sendMsg("/end");
                                 break;
                             }
-                            if(str.startsWith("/w")){
+                            if (str.startsWith("/w")) {
                                 String[] token = str.split(" ", 3);
                                 if (token.length < 3) {
                                     continue;
                                 }
-                                server.privateMessage(this, token[1], token[2]);
+                                server.privateMsg(this, token[1], token[2]);
                             }
-                        }else {
+
+                        } else {
                             server.broadcastMsg(this, str);
                         }
                     }
+
+                    //SocketTimeoutException
                 } catch (IOException e) {
                     e.printStackTrace();
                 } finally {
@@ -88,7 +114,7 @@ public class ClientHandler {
         }
     }
 
-    public void sendMsg(String msg){
+    public void sendMsg(String msg) {
         try {
             out.writeUTF(msg);
         } catch (IOException e) {
@@ -98,5 +124,9 @@ public class ClientHandler {
 
     public String getNickname() {
         return nickname;
+    }
+
+    public String getLogin() {
+        return login;
     }
 }
