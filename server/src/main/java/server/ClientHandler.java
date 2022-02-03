@@ -75,8 +75,9 @@ public class ClientHandler {
                         }
                     }
                     //цикл работы
+                    socket.setSoTimeout(0);
                     while (authenticated) {
-                        socket.setSoTimeout(0);
+
                         String str = in.readUTF();
 
                         if (str.startsWith("/")) {
@@ -91,7 +92,25 @@ public class ClientHandler {
                                 }
                                 server.privateMsg(this, token[1], token[2]);
                             }
-
+                            //====================================//
+                            if(str.startsWith("/chnick")){
+                                String[] token = str.split("\\s+",2);
+                                if(token.length < 2){
+                                    continue;
+                                }
+                                if(token[1].contains(" ")){
+                                    sendMsg("Ник не может содеожать пробелы");
+                                    continue;
+                                }
+                                if (server.getAuthService().changeNick(this.nickname, token[1])) {
+                                    sendMsg("/yurnickis " + token[1]);
+                                    this.nickname = token[1];
+                                    server.broadcastClientList();
+                                }else {
+                                    sendMsg("Не удалось изменить ник, Такой " + token[1] + " уже существует");
+                                }
+                            }
+                            //====================================//
                         } else {
                             server.broadcastMsg(this, str);
                         }

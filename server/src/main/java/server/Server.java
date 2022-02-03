@@ -22,7 +22,14 @@ public class Server {
 
     public Server() {
         clients = new CopyOnWriteArrayList<>();
-        authService = new SimpleAuthService();
+//        authService = new SimpleAuthService();
+
+        //========================================//
+        if (!SQLHandler.connect()) {
+            throw new RuntimeException("Отсутствует подклюение к БД");
+        }
+        authService = new dataBaseAuthService();
+        //========================================//
 
         try {
             server = new ServerSocket(PORT);
@@ -36,6 +43,7 @@ public class Server {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
+            SQLHandler.disconnect(); //*
             System.out.println("Server stop");
             try {
                 server.close();
@@ -44,7 +52,7 @@ public class Server {
             }
         }
     }
-
+ //------
     public void subscribe(ClientHandler clientHandler) {
         clients.add(clientHandler);
         broadcastClientList();
